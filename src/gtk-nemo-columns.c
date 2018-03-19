@@ -83,11 +83,14 @@ static void create_new_browser_pane (GtkTreeView *view,
 		strcat(dir_str, name);
 		d = opendir(dir_str);
 		if (d){
+			//remove the existing widget, the folder previously displayed
 			gtk_container_remove (GTK_CONTAINER(parent_pane), 
 			                      gtk_paned_get_child2 (GTK_PANED(parent_pane)));
+			//create new pane
 			pane = gtk_paned_new (GTK_ORIENTATION_HORIZONTAL);
 			gtk_paned_set_position (GTK_PANED(pane), 150);
 			gtk_paned_pack2 (GTK_PANED (parent_pane), pane, FALSE, FALSE);
+			//create new treeview
 			new_model = create_and_fill_model (dir_str);
 			treeview = gtk_tree_view_new_with_model (GTK_TREE_MODEL(new_model));
 			g_object_unref (new_model);
@@ -96,11 +99,13 @@ static void create_new_browser_pane (GtkTreeView *view,
 			gtk_tree_view_insert_column_with_attributes (GTK_TREE_VIEW (treeview),
 				                                       -1, "",  renderer,
 				                                       "text", 0, NULL);
+			//create new scrolled window
 			new_s_window = gtk_scrolled_window_new (NULL, NULL);
 			gtk_widget_set_size_request (GTK_WIDGET(new_s_window), 150, 150);
 			gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW(new_s_window), 
 					                    	GTK_POLICY_NEVER, 
 			                                GTK_POLICY_AUTOMATIC);
+			//add the treeview to the scrolled window
 			gtk_container_add(GTK_CONTAINER (new_s_window), treeview);
 			gtk_paned_pack1 (GTK_PANED (pane), new_s_window, FALSE, FALSE);
 			//add another scrolled window to activate the pane
@@ -113,11 +118,12 @@ static void create_new_browser_pane (GtkTreeView *view,
 			//connect the signal for when selecting a file
 			g_signal_connect(G_OBJECT(treeview), "cursor-changed", 
 			                 G_CALLBACK(create_new_browser_pane), pane);
+			//show everything we added
 			gtk_widget_show_all (GTK_WIDGET (parent_pane));
+			//scroll to the far right
 			h_adjustment = gtk_scrolled_window_get_hadjustment 
 							(GTK_SCROLLED_WINDOW(h_scrolled_window));
 			g_idle_add((GSourceFunc )scroll_to_right, h_adjustment);
-			//FIXME
 		}
 		//g_print ("selected file is: %s/%s\n", path, name);
 		g_free(name);
@@ -133,6 +139,8 @@ static void
 gtk_nemo_columns_new_window (GApplication *app)
 {
 	GtkWidget *window;
+	GtkWidget *box;
+	GtkWidget *label;
 	GtkWidget *pane;
 	GtkWidget *s_window;
 	GtkWidget *second_s_window;
@@ -143,13 +151,17 @@ gtk_nemo_columns_new_window (GApplication *app)
 	window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
 	gtk_window_set_title (GTK_WINDOW (window), "gtk-nemo-columns");
 	
-	
 	gtk_window_set_application (GTK_WINDOW (window), GTK_APPLICATION (app));
+	//create box to pack the side scrolling window and the label into
+	box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
+	gtk_container_add(GTK_CONTAINER (window), box);
+	label = gtk_label_new ("Created a label\nreplace with icon\nimage eventually");
+	gtk_box_pack_end (GTK_BOX (box), GTK_WIDGET(label), FALSE, FALSE, 5);
 	//create a side scrolling window
 	h_scrolled_window = gtk_scrolled_window_new (NULL, NULL);
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW(h_scrolled_window), 
 	                            	GTK_POLICY_AUTOMATIC, GTK_POLICY_NEVER);
-	gtk_container_add(GTK_CONTAINER (window), h_scrolled_window);
+	gtk_box_pack_start (GTK_BOX (box), GTK_WIDGET(h_scrolled_window), TRUE, TRUE, 0);
 	//create a horizontal pane, add to horizontal scrolled window
 	pane = gtk_paned_new (GTK_ORIENTATION_HORIZONTAL);
 	gtk_paned_set_position (GTK_PANED(pane), 150);
@@ -160,6 +172,7 @@ gtk_nemo_columns_new_window (GApplication *app)
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW(s_window), 
 	                            	GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
 	gtk_widget_set_size_request (GTK_WIDGET(s_window), 150, 150);
+	//create treeview with the primary folder
 	char dir[] = "..";
 	model = create_and_fill_model (dir);
 	treeview = gtk_tree_view_new_with_model (GTK_TREE_MODEL(model));
@@ -180,6 +193,7 @@ gtk_nemo_columns_new_window (GApplication *app)
 	//connect the signal for when selecting a file
 	g_signal_connect(G_OBJECT(treeview), "cursor-changed", 
 	                 G_CALLBACK(create_new_browser_pane), pane);
+	//set an initial size to the window and show it
 	gtk_window_set_default_size (GTK_WINDOW(window), 600, 400);
 	gtk_widget_show_all (GTK_WIDGET (window));
 }
