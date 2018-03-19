@@ -46,10 +46,12 @@ struct _Gtknemocolumns
 
 };
 
-static create_and_fill_model(void);
 
 GType gtk_nemo_columns_get_type (void) G_GNUC_CONST;
 Gtknemocolumns *gtk_nemo_columns_new (void);
+void treeview_selection_changed (GtkTreeView *view, 
+                                    GtkTreeModel *model, 
+                                    GtkPaned *parent_pane);
 
 /* Callbacks */
 

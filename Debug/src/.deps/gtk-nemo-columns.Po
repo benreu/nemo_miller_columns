@@ -608,7 +608,8 @@ gtk-nemo-columns.o: /home/reuben/gtk-nemo-columns/src/gtk-nemo-columns.c \
  /usr/include/gtk-3.0/gtk/deprecated/gtkvseparator.h \
  /usr/include/gtk-3.0/gtk/gtk-autocleanups.h \
  /usr/include/glib-2.0/glib/gi18n.h /usr/include/libintl.h \
- /usr/include/string.h
+ /usr/include/string.h /usr/include/x86_64-linux-gnu/sys/stat.h \
+ /usr/include/x86_64-linux-gnu/bits/stat.h
 
 /usr/include/stdc-predef.h:
 
@@ -1929,3 +1930,7 @@ gtk-nemo-columns.o: /home/reuben/gtk-nemo-columns/src/gtk-nemo-columns.c \
 /usr/include/libintl.h:
 
 /usr/include/string.h:
+
+/usr/include/x86_64-linux-gnu/sys/stat.h:
+
+/usr/include/x86_64-linux-gnu/bits/stat.h:
