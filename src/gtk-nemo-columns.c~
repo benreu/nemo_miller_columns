@@ -93,7 +93,7 @@ static void create_new_browser_pane (char *dir_str, GtkPaned *parent_pane){
 		//create new pane
 		pane = gtk_paned_new (GTK_ORIENTATION_HORIZONTAL);
 		gtk_paned_set_position (GTK_PANED(pane), 150);
-		gtk_paned_pack2 (GTK_PANED (parent_pane), pane, FALSE, FALSE);
+		gtk_paned_pack2 (GTK_PANED (parent_pane), pane, TRUE, FALSE);
 		//create new treeview
 		new_model = create_and_fill_model (dir_str);
 		treeview = gtk_tree_view_new_with_model (GTK_TREE_MODEL(new_model));
@@ -162,19 +162,10 @@ static void treeview_selection_changed (GtkTreeView *view,
 	}
 }
 
-static void limit_preview_size (GtkPaned *paned){
-	int position = gtk_widget_get_allocated_width(GTK_WIDGET(paned)) - 101;
-	gtk_paned_set_position (GTK_PANED(paned), position);
-}
-
 static void preview_size_changed (GtkPaned *paned){
 	//offset of 5 when calculating reverse position
 	preview_size = gtk_widget_get_allocated_width(GTK_WIDGET(paned)) - 
 					gtk_paned_get_position (GTK_PANED(paned)) - 5;
-	if (preview_size < 96){
-		g_idle_add ((GSourceFunc)limit_preview_size, paned);
-		preview_size = 96;
-	}
 	render_preview_image ();
 }
 
@@ -197,6 +188,7 @@ gtk_nemo_columns_new_window (GApplication *app)
 	GtkWidget *window;
 	GtkWidget *preview_box;
 	GtkWidget *pane;
+	GtkWidget *preview_scrolled_window;
 	GtkWidget *s_window;
 	GtkWidget *treeview;
 	GtkListStore *model;
@@ -216,34 +208,41 @@ gtk_nemo_columns_new_window (GApplication *app)
 	                  GTK_WIDGET(preview_image), FALSE, FALSE, 5);
 	gtk_box_pack_start (GTK_BOX (preview_box), 
 	                  GTK_WIDGET(preview_label), FALSE, FALSE, 5);
+	preview_scrolled_window = gtk_scrolled_window_new (NULL, NULL);
+	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW(preview_scrolled_window), 
+	                            	GTK_POLICY_EXTERNAL, GTK_POLICY_EXTERNAL);
+
+	//add the preview box to a scrolled window to allow us to reduce the image size
+	gtk_container_add(GTK_CONTAINER (preview_scrolled_window), preview_box);
+	gtk_widget_set_size_request (GTK_WIDGET(preview_scrolled_window), 48, -1);
 	//create pane to pack the side scrolling window and the preview box into
 	pane = gtk_paned_new (GTK_ORIENTATION_HORIZONTAL);
 	gtk_container_add(GTK_CONTAINER (window), pane);
 	g_signal_connect(G_OBJECT(pane), "size-allocate", 
 	                 G_CALLBACK(preview_size_changed), NULL);
-	g_idle_add ((GSourceFunc)limit_preview_size, pane);
-	//add the preview box to the pane
-	gtk_paned_pack2 (GTK_PANED (pane), preview_box, TRUE, TRUE);
+
+	//add the preview scrolled window to the pane
+	gtk_paned_pack2 (GTK_PANED (pane), preview_scrolled_window, FALSE, FALSE);
 	//create a side scrolling window, add to pane
 	h_scrolled_window = gtk_scrolled_window_new (NULL, NULL);
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW(h_scrolled_window), 
 	                            	GTK_POLICY_AUTOMATIC, GTK_POLICY_NEVER);
-	gtk_paned_pack1 (GTK_PANED (pane), h_scrolled_window, FALSE, FALSE);
+	
+	gtk_paned_pack1 (GTK_PANED (pane), h_scrolled_window, TRUE, FALSE);
 	//create a horizontal pane, add to horizontal scrolled window
 	pane = gtk_paned_new (GTK_ORIENTATION_HORIZONTAL);
 	gtk_paned_set_position (GTK_PANED(pane), 150);
-	//gtk_widget_set_size_request (GTK_WIDGET(pane), 50, 150);
 	gtk_container_add(GTK_CONTAINER (h_scrolled_window), pane);
 	//add a scrolled window
 	s_window = gtk_scrolled_window_new (NULL, NULL);
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW(s_window), 
 	                            	GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+	
 	gtk_widget_set_size_request (GTK_WIDGET(s_window), 150, 150);
 	//create treeview with the primary folder
 	char dir[] = "..";
 	model = create_and_fill_model (dir);
 	treeview = gtk_tree_view_new_with_model (GTK_TREE_MODEL(model));
-	//gtk_widget_set_size_request (GTK_WIDGET(treeview), 150, 50);
 	g_object_unref (model);
 	gtk_tree_view_set_headers_visible (GTK_TREE_VIEW(treeview), FALSE);
 	renderer = gtk_cell_renderer_text_new ();
@@ -256,6 +255,7 @@ gtk_nemo_columns_new_window (GApplication *app)
 	//connect the signal for when selecting a file
 	g_signal_connect(G_OBJECT(treeview), "cursor-changed", 
 	                 G_CALLBACK(treeview_selection_changed), pane);
+	
 	//set an initial size to the window and show it
 	gtk_window_set_default_size (GTK_WINDOW(window), 600, 400);
 	gtk_widget_show_all (GTK_WIDGET (window));
