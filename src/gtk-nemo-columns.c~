@@ -49,16 +49,24 @@ static GtkListStore *create_and_fill_model (char* directory){
 	GtkTreeIter iter;
 	
 	//g_print ("file is: %s\n", fullPath);
-	model = gtk_list_store_new (2, G_TYPE_STRING, G_TYPE_STRING);
+	model = gtk_list_store_new (3, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING);
 	struct dirent *dir;
 	//char *realpath;
 	d = opendir(directory);
 	if (d) {
 		while ((dir = readdir(d)) != NULL) {
+			if (strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0) {
+				continue;
+			}
 			char buf[PATH_MAX + 1];
 			realpath(directory, buf);
 			gtk_list_store_append (model, &iter);
-			gtk_list_store_set (model, &iter, 0, dir->d_name, 1, buf, -1);
+			if(dir->d_type == DT_DIR) {
+				gtk_list_store_set (model, &iter, 0, "folder", 1, dir->d_name, 2, buf, -1);
+			}
+			else{
+				gtk_list_store_set (model, &iter, 0, "text-x-generic", 1, dir->d_name, 2, buf, -1);
+			}
 		}
 	closedir(d);
 	}
@@ -99,12 +107,17 @@ static void create_new_browser_pane (char *dir_str, GtkPaned *parent_pane){
 		treeview = gtk_tree_view_new_with_model (GTK_TREE_MODEL(new_model));
 		g_object_unref (new_model);
 		gtk_tree_view_set_headers_visible (GTK_TREE_VIEW(treeview), FALSE);
+		
+		//add a pixbuf renderer to show the type of object
+		renderer = gtk_cell_renderer_pixbuf_new ();
+		gtk_tree_view_insert_column_with_attributes (GTK_TREE_VIEW (treeview),
+		                                           -1, "", renderer,"icon-name", 0, NULL);
+		
 		renderer = gtk_cell_renderer_text_new ();
-		//g_object_set(renderer, "ellipsize-set", FALSE);
 		g_object_set(renderer, "ellipsize", PANGO_ELLIPSIZE_MIDDLE, NULL);
 		gtk_tree_view_insert_column_with_attributes (GTK_TREE_VIEW (treeview),
 			                                       -1, "",  renderer,
-			                                       "text", 0, NULL);
+			                                       "text", 1, NULL);
 		//create new scrolled window
 		new_s_window = gtk_scrolled_window_new (NULL, NULL);
 		gtk_widget_set_size_request (GTK_WIDGET(new_s_window), 150, 150);
@@ -135,13 +148,14 @@ static void treeview_selection_changed (GtkTreeView *view,
 	GtkTreeSelection *selection;
 	GtkTreeIter       iter;
 	GdkPixbuf *pixbuf;
+	GtkWidget *previous_treeview;
 	
 	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(view));
 	if (gtk_tree_selection_get_selected(GTK_TREE_SELECTION(selection), &model, &iter)) {
 		gchar *name;
 		gchar *path;
-		gtk_tree_model_get (model, &iter, 0, &name, -1);
-		gtk_tree_model_get (model, &iter, 1, &path, -1);
+		gtk_tree_model_get (model, &iter, 1, &name, -1);
+		gtk_tree_model_get (model, &iter, 2, &path, -1);
 		strcpy(dir_str, path);
 		strcat(dir_str, "/");
 		strcat(dir_str, name);
@@ -149,12 +163,17 @@ static void treeview_selection_changed (GtkTreeView *view,
 		stat(dir_str, &path_stat);
 		if (S_ISDIR(path_stat.st_mode)){
 			create_new_browser_pane(dir_str, parent_pane);
-			pixbuf = gdk_pixbuf_new (GDK_COLORSPACE_RGB, FALSE, 8, 1, 1);
-			gtk_image_set_from_pixbuf (GTK_IMAGE(preview_image), pixbuf);
+			//pixbuf = gdk_pixbuf_new ("folder", FALSE, 8, 1, 1);
+			gtk_image_set_from_icon_name (GTK_IMAGE(preview_image), "text-x-generic", GTK_ICON_SIZE_MENU);
+			gtk_widget_show (GTK_WIDGET(preview_image));
 		}
 		else if (S_ISREG(path_stat.st_mode)){
 			render_preview_image ();
-			//FIXME
+			previous_treeview = gtk_paned_get_child2 (GTK_PANED(parent_pane));
+			if (previous_treeview){
+				gtk_container_remove (GTK_CONTAINER(parent_pane),
+					                gtk_paned_get_child2 (GTK_PANED(parent_pane)));
+			}
 		}
 		gtk_label_set_label (GTK_LABEL(preview_label),name);
 		g_free(name);
@@ -171,7 +190,7 @@ static void preview_size_changed (GtkPaned *paned){
 
 static void render_preview_image (){
 	GdkPixbuf *pixbuf;
-
+	//g_print("%s", dir_str);
 	pixbuf = gdk_pixbuf_new_from_file_at_scale (dir_str, 
 			                                    preview_size, 
 			                                    preview_size, 
@@ -203,7 +222,7 @@ gtk_nemo_columns_new_window (GApplication *app)
 	preview_label = gtk_label_new ("");
 	gtk_label_set_line_wrap (GTK_LABEL(preview_label), TRUE);
 	gtk_widget_set_size_request (GTK_WIDGET(preview_box), 12, 12);
-	preview_image = gtk_image_new ();
+	preview_image = gtk_image_new_from_icon_name ("directory", GTK_ICON_SIZE_DND);
 	gtk_box_pack_start (GTK_BOX (preview_box), 
 	                  GTK_WIDGET(preview_image), FALSE, FALSE, 5);
 	gtk_box_pack_start (GTK_BOX (preview_box), 
@@ -223,7 +242,7 @@ gtk_nemo_columns_new_window (GApplication *app)
 
 	//add the preview scrolled window to the pane
 	gtk_paned_pack2 (GTK_PANED (pane), preview_scrolled_window, FALSE, FALSE);
-	//create a side scrolling window, add to pane
+	//create a side scrolling window for file browsing, add to pane
 	h_scrolled_window = gtk_scrolled_window_new (NULL, NULL);
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW(h_scrolled_window), 
 	                            	GTK_POLICY_AUTOMATIC, GTK_POLICY_NEVER);
@@ -245,10 +264,17 @@ gtk_nemo_columns_new_window (GApplication *app)
 	treeview = gtk_tree_view_new_with_model (GTK_TREE_MODEL(model));
 	g_object_unref (model);
 	gtk_tree_view_set_headers_visible (GTK_TREE_VIEW(treeview), FALSE);
+
+	//add a pixbuf renderer to show the type of object
+	renderer = gtk_cell_renderer_pixbuf_new ();
+	gtk_tree_view_insert_column_with_attributes (GTK_TREE_VIEW (treeview),
+                                               -1, "", renderer,"icon-name", 0, NULL);
+	
+	//add a text renderer to show the name
 	renderer = gtk_cell_renderer_text_new ();
 	g_object_set(renderer, "ellipsize", PANGO_ELLIPSIZE_MIDDLE, NULL);
 	gtk_tree_view_insert_column_with_attributes (GTK_TREE_VIEW (treeview),
-                                               -1, "", renderer,"text", 0, NULL);
+                                               -1, "", renderer,"text", 1, NULL);
 	
 	gtk_container_add(GTK_CONTAINER (s_window), treeview);
 	gtk_paned_pack1 (GTK_PANED (pane), s_window, FALSE, FALSE);
